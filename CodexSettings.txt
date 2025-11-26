@@ -1,0 +1,3 @@
+diamond: abs(sx) + abs(sy) < 0.4
+upperRight: sx >= -0.2 and sy>=-0.2
+ring: 0.4 < math.hypot(sx,sy) < 0.6
