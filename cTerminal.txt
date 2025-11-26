@@ -1,0 +1,1165 @@
+Documentation Bundle
+====================
+
+Table of Contents
+-----------------
+1. CodexSettings.txt
+2. curved_spiral.py
+3. diagram_2d.py
+4. diagram_3d.py
+5. docs.py
+6. engine_api.py
+7. main.py
+8. main_window.py
+9. model_state.py
+10. plugin_manager.py
+11. state_helper.py
+12. turing_complete_demo.py
+
+
+[1] CodexSettings.txt
+---------------------
+;Content of CodexSettings.txt
+diamond: abs(sx) + abs(sy) < 0.4
+upperRight: sx >= -0.2 and sy>=-0.2
+ring: 0.4 < math.hypot(sx,sy) < 0.6
+
+[2] curved_spiral.py
+--------------------
+;Content of curved_spiral.py
+import math
+
+def register(engine):
+
+    def spiral(t, sx1, sy1, sx2, sy2, z2):
+        r = t * 1.1
+        x = sx1 + r*math.cos(8*t)
+        y = sy1 + r*math.sin(8*t)
+        z = t*z2
+        return x, y, z
+
+    engine.register_path("spiral", spiral)
+
+
+[3] diagram_2d.py
+-----------------
+;Content of diagram_2d.py
+# ui/diagram_2d.py
+# ------------------------------------------------------------
+# 2D Projective Line + Angular Direction Diagram
+# Synchronised with ModelState
+# Clean modular import structure
+# ------------------------------------------------------------
+
+from PyQt6 import QtCore, QtGui, QtWidgets
+import pyqtgraph as pg
+import math
+
+from core.model_state import ModelState
+from core.state_helper import CodexDiagramStateHelper
+
+
+class DraggablePoint(pg.GraphicsObject):
+    """
+    A simple draggable point used for origin (pivot) and the second point.
+    """
+    
+    # 🔥 THIS WAS MISSING — REQUIRED FOR GLOBAL ACCESS
+    instance = None
+
+    sigMoved = QtCore.pyqtSignal(float, float)
+
+    def __init__(self, x, y, radius=6, brush=None):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.brush = brush or pg.mkBrush('w')
+        self.pen = pg.mkPen('w')
+        self.setFlag(self.GraphicsItemFlag.ItemIsMovable, True)
+        self.setFlag(self.GraphicsItemFlag.ItemIgnoresTransformations)
+
+    def boundingRect(self):
+        return QtCore.QRectF(
+            self.x - self.radius,
+            self.y - self.radius,
+            2*self.radius,
+            2*self.radius,
+        )
+
+    def paint(self, p, *args):
+        p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        p.setBrush(self.brush)
+        p.setPen(self.pen)
+        p.drawEllipse(QtCore.QPointF(self.x, self.y), self.radius, self.radius)
+
+    def setPos(self, x, y):
+        self.x = x
+        self.y = y
+        self.prepareGeometryChange()
+        super().setPos(QtCore.QPointF(x, y))
+
+    def mouseDragEvent(self, ev):
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton:
+            if ev.isStart():
+                ev.accept()
+            elif ev.isFinish():
+                ev.accept()
+            else:
+                pos = ev.pos()
+                self.setPos(pos.x(), pos.y())
+                self.sigMoved.emit(pos.x(), pos.y())
+                ev.accept()
+
+
+class Diagram2DWidget(QtWidgets.QWidget):
+    """
+    2D interactive diagram:
+      - Horizontal projective line
+      - Pivot point P1 on the line
+      - Angular ray to second point P2
+      - Spinboxes: U, u, r2, theta2
+      - Synchronised with ModelState
+    """
+
+    def __init__(self, state: ModelState, parent=None):
+        super().__init__(parent)
+        self.state = state
+        self._updating = False
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        # ----------------------------------------------------
+        # Plot
+        # ----------------------------------------------------
+        self.plot = pg.PlotWidget()
+        self.plot.setBackground('black')
+        self.plot.setMouseEnabled(x=False, y=False)
+        self.plot.showGrid(x=True, y=True, alpha=0.2)
+        self.plot.setYRange(-1.5, 1.5)
+        self.plot.setXRange(-10, 10)
+        layout.addWidget(self.plot, 1)
+
+        # Base projective line
+        self.base_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen('w', width=2))
+        self.plot.addItem(self.base_line)
+
+        # Pivot point P1
+        self.p1 = DraggablePoint(0, 0, radius=6, brush=pg.mkBrush('w'))
+        self.plot.addItem(self.p1)
+
+        # Second point P2
+        self.p2 = DraggablePoint(1, 0.2, radius=6, brush=pg.mkBrush('y'))
+        self.plot.addItem(self.p2)
+
+        # Ray line
+        self.ray = pg.PlotDataItem(pen=pg.mkPen('y', width=2))
+        self.plot.addItem(self.ray)
+
+        # ----------------------------------------------------
+        # Controls
+        # ----------------------------------------------------
+        controls = QtWidgets.QHBoxLayout()
+        layout.addLayout(controls)
+
+        self.spin_U = QtWidgets.QDoubleSpinBox()
+        self.spin_U.setRange(0.01, 9999)
+        self.spin_U.setDecimals(3)
+        self.spin_U.setPrefix("U = ")
+        controls.addWidget(self.spin_U)
+
+        self.spin_u = QtWidgets.QDoubleSpinBox()
+        self.spin_u.setRange(-9999, 9999)
+        self.spin_u.setDecimals(3)
+        self.spin_u.setPrefix("u = ")
+        controls.addWidget(self.spin_u)
+
+        self.spin_r2 = QtWidgets.QDoubleSpinBox()
+        self.spin_r2.setRange(0, 9999)
+        self.spin_r2.setDecimals(3)
+        self.spin_r2.setPrefix("r₂ = ")
+        controls.addWidget(self.spin_r2)
+
+        self.spin_theta2 = QtWidgets.QDoubleSpinBox()
+        self.spin_theta2.setRange(-9999, 9999)
+        self.spin_theta2.setDecimals(3)
+        self.spin_theta2.setPrefix("θ₂ = ")
+        controls.addWidget(self.spin_theta2)
+
+        controls.addStretch(1)
+
+        # ----------------------------------------------------
+        # Signals
+        # ----------------------------------------------------
+        self.p1.sigMoved.connect(self._on_drag_p1)
+        self.p2.sigMoved.connect(self._on_drag_p2)
+
+        self.spin_U.valueChanged.connect(lambda v: self.state.set_U(v))
+        self.spin_u.valueChanged.connect(lambda v: self.state.set_u(v))
+        self.spin_r2.valueChanged.connect(lambda v: self.state.set_r2(v))
+        self.spin_theta2.valueChanged.connect(lambda v: self.state.set_theta2(v))
+
+        self.state.changed.connect(self._update)
+
+        # Initial update
+        self._update()
+
+    # --------------------------------------------------------
+    # Handlers
+    # --------------------------------------------------------
+
+    def _on_drag_p1(self, x, y):
+        if y != 0:
+            y = 0
+        self.state.set_pivot(x)
+
+    def _on_drag_p2(self, x, y):
+        dx = x - self.state.u
+        dy = y - 0
+        r2 = math.hypot(dx, dy)
+        theta2 = math.atan2(dy, dx)
+        self.state.set_r2(r2)
+        self.state.set_theta2(theta2)
+
+    # --------------------------------------------------------
+    # Update UI
+    # --------------------------------------------------------
+
+    def _update(self):
+        if self._updating:
+            return
+        self._updating = True
+
+        U = self.state.U
+        u = self.state.u
+        r2 = self.state.r2
+        theta2 = self.state.theta2
+
+        x1 = u
+        y1 = 0
+
+        x2 = x1 + r2 * math.cos(theta2)
+        y2 = y1 + r2 * math.sin(theta2)
+
+        self.p1.setPos(x1, y1)
+        self.p2.setPos(x2, y2)
+        self.ray.setData([x1, x2], [y1, y2])
+
+        self.spin_U.blockSignals(True)
+        self.spin_U.setValue(U)
+        self.spin_U.blockSignals(False)
+
+        self.spin_u.blockSignals(True)
+        self.spin_u.setValue(u)
+        self.spin_u.blockSignals(False)
+
+        self.spin_r2.blockSignals(True)
+        self.spin_r2.setValue(r2)
+        self.spin_r2.blockSignals(False)
+
+        self.spin_theta2.blockSignals(True)
+        self.spin_theta2.setValue(theta2)
+        self.spin_theta2.blockSignals(False)
+
+        text = f"mode=2D | U={U:.3f}, u={u:.3f} | r₂={r2:.3f}, θ₂={theta2:.3f}"
+
+        helper = CodexDiagramStateHelper.instance
+        if helper is not None:
+            helper.write("2d", text)
+
+
+        self._updating = False
+
+
+[4] diagram_3d.py
+-----------------
+;Content of diagram_3d.py
+# ui/diagram_3d.py
+# ------------------------------------------------------------
+# 3D Projective Square-Plane Model
+# - P1 pivot
+# - P2 derived from (r2, theta2, z2)
+# - Subspace overlays
+# - Path generation
+# - Plugin hooks (custom paths / subspaces)
+# ------------------------------------------------------------
+
+from PyQt6 import QtCore, QtWidgets
+import pyqtgraph.opengl as gl
+import numpy as np
+import math
+
+from core.model_state import ModelState
+from core.state_helper import CodexDiagramStateHelper
+
+
+class Diagram3DWidget(QtWidgets.QWidget):
+    
+    # 🔥 THIS WAS MISSING — REQUIRED FOR GLOBAL ACCESS
+    instance = None
+
+    def __init__(self, state: ModelState, parent=None):
+        super().__init__(parent)
+
+        self.state = state
+        self._updating = False
+
+        # Dictionary for plugin paths
+        self.custom_paths = {}
+
+        # Dictionary for plugin subspaces
+        self.custom_subspaces = {}
+
+        # Rendering scale
+        self.RADIUS = 1.6
+
+        # --------------------------------------------------------
+        # Layout
+        # --------------------------------------------------------
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4,4,4,4)
+
+        # --------------------------------------------------------
+        # 3D view
+        # --------------------------------------------------------
+        self.view = gl.GLViewWidget()
+        self.view.setBackgroundColor("black")
+        self.view.setCameraPosition(distance=6.0, elevation=35, azimuth=45)
+        layout.addWidget(self.view, 1)
+
+        grid = gl.GLGridItem()
+        grid.setSize(4,4)
+        grid.setSpacing(0.5,0.5)
+        grid.setColor((0.3,0.3,0.3,1))
+        self.view.addItem(grid)
+
+        # Square plane
+        R = self.RADIUS
+        square = np.array([
+            [-R,-R,0],
+            [ R,-R,0],
+            [ R, R,0],
+            [-R, R,0],
+            [-R,-R,0]
+        ])
+        self.square_item = gl.GLLinePlotItem(
+            pos=square, color=(1,1,1,1), width=2, mode='line_strip'
+        )
+        self.view.addItem(self.square_item)
+
+        # Pivot mesh (P1)
+        meshP1 = gl.MeshData.sphere(rows=16, cols=32, radius=0.08)
+        self.pivot_mesh = gl.GLMeshItem(meshdata=meshP1, smooth=True, color=(1,1,1,1))
+        self.view.addItem(self.pivot_mesh)
+
+        # Second point mesh (P2)
+        meshP2 = gl.MeshData.sphere(rows=16, cols=32, radius=0.08)
+        self.second_mesh = gl.GLMeshItem(meshdata=meshP2, smooth=True, color=(1,1,0,1))
+        self.view.addItem(self.second_mesh)
+
+        # Ray
+        self.ray_gl = gl.GLLinePlotItem(
+            pos=np.zeros((2,3)),
+            color=(1,1,0,1),
+            width=3,
+            mode='lines'
+        )
+        self.view.addItem(self.ray_gl)
+
+        # Path
+        self.path_gl = gl.GLLinePlotItem(
+            pos=np.zeros((10,3)),
+            color=(0.8,0.8,0.8,1),
+            width=2,
+            mode='line_strip'
+        )
+        self.view.addItem(self.path_gl)
+
+        # --------------------------------------------------------
+        # Controls
+        # --------------------------------------------------------
+        controls = QtWidgets.QHBoxLayout()
+        layout.addLayout(controls)
+
+        self.spin_sx = QtWidgets.QDoubleSpinBox()
+        self.spin_sx.setRange(-1,1)
+        self.spin_sx.setDecimals(3)
+        self.spin_sx.setPrefix("x̄ = ")
+        controls.addWidget(self.spin_sx)
+
+        self.spin_sy = QtWidgets.QDoubleSpinBox()
+        self.spin_sy.setRange(-1,1)
+        self.spin_sy.setDecimals(3)
+        self.spin_sy.setPrefix("ȳ = ")
+        controls.addWidget(self.spin_sy)
+
+        self.spin_r2 = QtWidgets.QDoubleSpinBox()
+        self.spin_r2.setRange(0,100)
+        self.spin_r2.setDecimals(3)
+        self.spin_r2.setPrefix("r₂ = ")
+        controls.addWidget(self.spin_r2)
+
+        self.spin_theta2 = QtWidgets.QDoubleSpinBox()
+        self.spin_theta2.setRange(-999,999)
+        self.spin_theta2.setDecimals(3)
+        self.spin_theta2.setPrefix("θ₂ = ")
+        controls.addWidget(self.spin_theta2)
+
+        self.spin_z2 = QtWidgets.QDoubleSpinBox()
+        self.spin_z2.setRange(-10,10)
+        self.spin_z2.setDecimals(3)
+        self.spin_z2.setPrefix("z₂ = ")
+        controls.addWidget(self.spin_z2)
+
+        controls.addStretch(1)
+
+        # --------------------------------------------------------
+        # Subspace Box
+        # --------------------------------------------------------
+        sub_box = QtWidgets.QGroupBox("Sub-spaces (expr per line)")
+        sub_layout = QtWidgets.QVBoxLayout(sub_box)
+
+        self.sub_edit = QtWidgets.QPlainTextEdit()
+        self.sub_edit.setFixedHeight(90)
+        self.sub_edit.setStyleSheet(
+            "background-color:black; color:white; border:1px solid #444;"
+        )
+        sub_layout.addWidget(self.sub_edit)
+
+        self.btn_apply_sub = QtWidgets.QPushButton("Apply subspaces")
+        sub_layout.addWidget(self.btn_apply_sub)
+
+        layout.addWidget(sub_box)
+
+        # Mesh list
+        self.subspace_items = []
+
+        # --------------------------------------------------------
+        # Path Box
+        # --------------------------------------------------------
+        path_box = QtWidgets.QGroupBox("Path x(t), y(t), z(t)   0 ≤ t ≤ 1")
+        path_layout = QtWidgets.QHBoxLayout(path_box)
+
+        form = QtWidgets.QFormLayout()
+
+        self.expr_x = QtWidgets.QLineEdit("sx1 + t*(sx2 - sx1)")
+        self.expr_y = QtWidgets.QLineEdit("sy1 + t*(sy2 - sy1)")
+        self.expr_z = QtWidgets.QLineEdit("0.4 * math.sin(3*t)")
+
+        form.addRow("x(t) =", self.expr_x)
+        form.addRow("y(t) =", self.expr_y)
+        form.addRow("z(t) =", self.expr_z)
+
+        path_layout.addLayout(form)
+
+        self.btn_apply_path = QtWidgets.QPushButton("Build path")
+        path_layout.addWidget(self.btn_apply_path)
+
+        layout.addWidget(path_box)
+
+        # --------------------------------------------------------
+        # Signals
+        # --------------------------------------------------------
+        self.spin_sx.valueChanged.connect(lambda v: self.state.set_from_square(v, self.state.sy))
+        self.spin_sy.valueChanged.connect(lambda v: self.state.set_from_square(self.state.sx, v))
+        self.spin_r2.valueChanged.connect(lambda v: self.state.set_r2(v))
+        self.spin_theta2.valueChanged.connect(lambda v: self.state.set_theta2(v))
+        self.spin_z2.valueChanged.connect(lambda v: self.state.set_z2(v))
+
+        self.btn_apply_sub.clicked.connect(self._apply_subspaces)
+        self.btn_apply_path.clicked.connect(self._build_path)
+
+        self.state.changed.connect(self._update)
+
+        self._update()
+
+    # ----------------------------------------------------------
+    # Subspaces
+    # ----------------------------------------------------------
+
+    def _apply_subspaces(self):
+        for it in self.subspace_items:
+            try: self.view.removeItem(it)
+            except: pass
+        self.subspace_items.clear()
+
+        lines = self.sub_edit.toPlainText().splitlines()
+        R = self.RADIUS
+
+        safe_globals = {
+            "__builtins__": {},
+            "math": math,
+            "abs": abs, "min": min, "max": max
+        }
+
+        for idx, line in enumerate(lines):
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+
+            expr = s.split(":",1)[-1].strip()
+
+            pts = []
+            N = 27
+            for i in range(N):
+                sx = -1 + 2*i/(N-1)
+                for j in range(N):
+                    sy = -1 + 2*j/(N-1)
+
+                    env = dict(
+                        sx=sx, sy=sy,
+                        x=sx, y=sy,
+                        r=math.hypot(sx,sy),
+                        theta=math.atan2(sy,sx),
+                    )
+
+                    try:
+                        if bool(eval(expr, safe_globals, env)):
+                            pts.append([sx*R, sy*R, 0])
+                    except:
+                        pass
+
+            if pts:
+                color = (0.4+0.15*(idx%3),)*3 + (0.8,)
+                item = gl.GLScatterPlotItem(pos=np.array(pts,float), color=color, size=4)
+                self.view.addItem(item)
+                self.subspace_items.append(item)
+
+    # ----------------------------------------------------------
+    # Path Builder
+    # ----------------------------------------------------------
+
+    def _build_path(self):
+        safe_globals = {"__builtins__": {},
+                        "math": math}
+
+        sx1, sy1 = self.state.sx, self.state.sy
+        sx2 = self.state.sx + self.state.r2*math.cos(self.state.theta2)
+        sy2 = self.state.sy + self.state.r2*math.sin(self.state.theta2)
+        z2  = self.state.z2
+
+        ex = self.expr_x.text().strip()
+        ey = self.expr_y.text().strip()
+        ez = self.expr_z.text().strip()
+
+        pts=[]
+        for t in np.linspace(0,1,300):
+            env = dict(t=t,
+                       sx1=sx1, sy1=sy1,
+                       sx2=sx2, sy2=sy2,
+                       z2=z2)
+            try:
+                x = eval(ex, safe_globals, env)
+                y = eval(ey, safe_globals, env)
+                z = eval(ez, safe_globals, env)
+                pts.append([x*self.RADIUS, y*self.RADIUS, z])
+            except:
+                continue
+
+        if pts:
+            self.path_gl.setData(pos=np.array(pts,float))
+
+    # ----------------------------------------------------------
+    # Update view
+    # ----------------------------------------------------------
+
+    def _update(self):
+        if self._updating:
+            return
+        self._updating = True
+
+        sx = self.state.sx
+        sy = self.state.sy
+        r2 = self.state.r2
+        theta2 = self.state.theta2
+        z2 = self.state.z2
+
+        x1 = self.RADIUS*sx
+        y1 = self.RADIUS*sy
+        z1 = 0
+
+        self.pivot_mesh.resetTransform()
+        self.pivot_mesh.translate(x1, y1, z1)
+
+        sx2 = sx + r2*math.cos(theta2)
+        sy2 = sy + r2*math.sin(theta2)
+
+        x2 = self.RADIUS*sx2
+        y2 = self.RADIUS*sy2
+
+        self.second_mesh.resetTransform()
+        self.second_mesh.translate(x2, y2, z2)
+
+        self.ray_gl.setData(
+            pos=np.array([[x1,y1,0],[x2,y2,z2]])
+        )
+
+        self._build_path()
+
+        # spinboxes
+        self.spin_sx.blockSignals(True); self.spin_sx.setValue(sx); self.spin_sx.blockSignals(False)
+        self.spin_sy.blockSignals(True); self.spin_sy.setValue(sy); self.spin_sy.blockSignals(False)
+        self.spin_r2.blockSignals(True); self.spin_r2.setValue(r2); self.spin_r2.blockSignals(False)
+        self.spin_theta2.blockSignals(True); self.spin_theta2.setValue(theta2); self.spin_theta2.blockSignals(False)
+        self.spin_z2.blockSignals(True); self.spin_z2.setValue(z2); self.spin_z2.blockSignals(False)
+
+        txt = f"mode=3D | x̄={sx:.3f},ȳ={sy:.3f} | r₂={r2:.3f}, θ₂={theta2:.3f} | z₂={z2:.3f}"
+
+        helper = CodexDiagramStateHelper.instance
+        if helper is not None:
+            helper.write("3d", txt)
+
+
+        self._updating=False
+
+
+[5] docs.py
+-----------
+;Content of docs.py
+import os
+
+def list_text_files():
+    # Corrected missing comma between '.env' and '.gitignore'
+    # Also corrected 'json' to '.json'
+    extensions = [
+        '.css', '.cmd', '.env', '.gitignore', '.js',
+        '.php', '.hpp', '.cpp', '.md', '.py', '.txt',
+        '.ps1', '.json', '.html'
+    ]
+    # Filter files in the current directory based on specified extensions
+    return [
+        f for f in os.listdir()
+        if os.path.isfile(f) and any(f.endswith(ext) for ext in extensions)
+    ]
+
+def read_file_content(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            return file.read()
+    except Exception as e:
+        return f"[Error reading {filename}]: {e}"
+
+def sort_files(files):
+    # Extract numbers from filenames and sort based on those numbers
+    def extract_number(file):
+        try:
+            return int(os.path.splitext(file)[0])
+        except ValueError:
+            return float('inf')  # In case of unexpected filename format, put it at the end
+
+    return sorted(files, key=extract_number)
+
+def create_txt(files):
+    os.makedirs("doc", exist_ok=True)  # Ensure 'doc' directory exists
+    output_path = os.path.join("doc", "doc.txt")
+
+    # Prepare sections (index, filename, content)
+    sections = []
+    for idx, file in enumerate(files, start=1):
+        content = read_file_content(file)
+        sections.append((idx, file, content))
+
+    with open(output_path, "w", encoding='utf-8') as txt_file:
+        # Header
+        txt_file.write("Documentation Bundle\n")
+        txt_file.write("====================\n\n")
+
+        # Table of Contents
+        txt_file.write("Table of Contents\n")
+        txt_file.write("-----------------\n")
+        for idx, file, _ in sections:
+            txt_file.write(f"{idx}. {file}\n")
+        txt_file.write("\n\n")
+
+        # Sections
+        for idx, file, content in sections:
+            header = f"[{idx}] {file}"
+            txt_file.write(header + "\n")
+            txt_file.write("-" * len(header) + "\n")
+            txt_file.write(f";Content of {file}\n")
+            txt_file.write(content)
+            txt_file.write("\n\n")
+
+if __name__ == "__main__":
+    text_files = list_text_files()
+    sorted_text_files = sort_files(text_files)
+
+    create_txt(sorted_text_files)  # Generate the text file
+
+    print("Documentation updated: Created 'doc/doc.txt'")
+
+
+[6] engine_api.py
+-----------------
+;Content of engine_api.py
+# core/engine_api.py
+import math
+
+class CodexEngineAPI:
+    """
+    API exposed to plugins.
+    Grants access to:
+      - state
+      - 2D & 3D diagram widgets
+      - path registration
+      - subspace registration
+      - full refresh
+    """
+
+    def __init__(self, state, diagram2d, diagram3d):
+        self.state = state
+        self.diagram2d = diagram2d
+        self.diagram3d = diagram3d
+
+    # -------------------- Path registration -----------------------
+    def register_path(self, name, fn):
+        self.diagram3d.custom_paths[name] = fn
+
+    # -------------------- Subspace registration -------------------
+    def register_subspace(self, name, expr: str):
+        self.diagram3d.custom_subspaces[name] = expr
+
+    # -------------------- Utility -------------------------------
+    def refresh(self):
+        self.state.changed.emit()
+
+    def get_state(self):
+        return self.state
+
+
+[7] main.py
+-----------
+;Content of main.py
+# main.py
+from PyQt6 import QtWidgets
+import sys
+
+from ui.main_window import MainWindow
+
+
+def main():
+    app = QtWidgets.QApplication(sys.argv)
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
+
+
+[8] main_window.py
+------------------
+;Content of main_window.py
+# ui/main_window.py
+# ------------------------------------------------------------
+# MainWindow: top-level GUI for Codex geometry engine
+# ------------------------------------------------------------
+
+from PyQt6 import QtCore, QtWidgets
+from core.model_state import ModelState
+from core.engine_api import CodexEngineAPI
+from core.plugin_manager import PluginManager
+from core.state_helper import CodexDiagramStateHelper
+
+from ui.diagram_2d import Diagram2DWidget
+from ui.diagram_3d import Diagram3DWidget
+
+class AddressHistory:
+    instance = None
+
+    def __init__(self):
+        self.records = []
+        AddressHistory.instance = self
+
+    def add(self, mode, text):
+        self.records.append((mode, text))
+
+    def dump(self):
+        return "\n".join(f"[{m}] {t}" for (m, t) in self.records)
+
+
+
+class AddressDock(QtWidgets.QDockWidget):
+    def __init__(self, label: QtWidgets.QLabel, parent=None):
+        super().__init__("Address Panel", parent)
+        self.setAllowedAreas(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea)
+
+        frame = QtWidgets.QFrame()
+        layout = QtWidgets.QHBoxLayout(frame)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.addWidget(label)
+
+        self.setWidget(frame)
+
+    def toggle(self):
+        self.setVisible(not self.isVisible())
+
+
+
+class MainWindow(QtWidgets.QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Codex Engine — 2D / 3D Projective System")
+        self.resize(1200, 900)
+
+        # ========================================================
+        # STATE
+        # ========================================================
+        self.state = ModelState(U=12.0, parent=self)
+
+        # ========================================================
+        # UI Layout
+        # ========================================================
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+        layout = QtWidgets.QVBoxLayout(central)
+
+        # ========================================================
+        # ADDRESS BAR (must be created BEFORE diagram widgets)
+        # ========================================================
+        self.addr_label = QtWidgets.QLabel("")
+        CodexDiagramStateHelper.instance = CodexDiagramStateHelper(self.addr_label)
+        # Add it to the layout later so it appears visually last
+
+        # ---------------- Tabs (2D / 3D) ----------------
+        tabrow = QtWidgets.QHBoxLayout()
+
+        self.btn2d = QtWidgets.QPushButton("2D")
+        self.btn3d = QtWidgets.QPushButton("3D")
+        self.btn2d.setCheckable(True)
+        self.btn3d.setCheckable(True)
+        self.btn2d.setChecked(True)
+
+        tabrow.addWidget(self.btn2d)
+        tabrow.addWidget(self.btn3d)
+        tabrow.addStretch(1)
+
+        layout.addLayout(tabrow)
+
+        # ---------------- Stacked diagram view -------------
+        self.stack = QtWidgets.QStackedWidget()
+        layout.addWidget(self.stack, 1)
+
+        # 2D and 3D widgets created AFTER helper exists
+        self.w2d = Diagram2DWidget(self.state)
+        self.w3d = Diagram3DWidget(self.state)
+
+        self.stack.addWidget(self.w2d)
+        self.stack.addWidget(self.w3d)
+
+        # ---------------- Address bar (functional placement) ----
+        self.addr_dock = AddressDock(self.addr_label, self)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.addr_dock)
+
+        # ---------------- Connect tab switching -------------
+        self.btn2d.clicked.connect(self._go2d)
+        self.btn3d.clicked.connect(self._go3d)
+
+        # ========================================================
+        # ENGINE API + PLUGINS
+        # ========================================================
+        self.engine_api = CodexEngineAPI(self.state, self.w2d, self.w3d)
+        self.plugins = PluginManager(self.engine_api, plugin_dir="plugins")
+        self.plugins.load_all()
+
+        # ---------------- Reload button ---------------------
+        reload_btn = QtWidgets.QPushButton("Reload Plugins")
+        reload_btn.clicked.connect(self._reload)
+        layout.addWidget(reload_btn)
+        
+        toggle_addr = QtWidgets.QPushButton("Toggle Address Bar")
+        toggle_addr.clicked.connect(lambda: self.addr_dock.toggle())
+        layout.addWidget(toggle_addr)
+        
+        # Create global history holder
+        self.history = AddressHistory()
+
+        # Collapsible history viewer
+        history_btn = QtWidgets.QPushButton("History")
+        history_btn.clicked.connect(self._show_history)
+        layout.addWidget(history_btn)
+
+
+
+    # ==========================================================
+    # Tab operations
+    # ==========================================================
+
+    def _go2d(self):
+        self.btn3d.setChecked(False)
+        self.stack.setCurrentWidget(self.w2d)
+        CodexDiagramStateHelper.instance.set_active("2d")
+
+    def _go3d(self):
+        self.btn2d.setChecked(False)
+        self.stack.setCurrentWidget(self.w3d)
+        CodexDiagramStateHelper.instance.set_active("3d")
+
+    def _show_history(self):
+        text = AddressHistory.instance.dump()
+        dlg = QtWidgets.QMessageBox(self)
+        dlg.setWindowTitle("Address History")
+        dlg.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        dlg.setText(text if text else "(no history yet)")
+        dlg.exec()
+
+
+
+    # ==========================================================
+    # Plugin Reload
+    # ==========================================================
+
+    def _reload(self):
+        self.plugins.load_all()
+
+
+
+[9] model_state.py
+------------------
+;Content of model_state.py
+# core/model_state.py
+# ------------------------------------------------------------
+# Core shared state for Codex 2D + 3D synchronized geometry engine.
+# ------------------------------------------------------------
+
+from PyQt6 import QtCore
+import math
+
+
+class ModelState(QtCore.QObject):
+    """Central state for both diagrams."""
+
+    changed = QtCore.pyqtSignal()
+
+    def __init__(self, U=12.0, parent=None):
+        super().__init__(parent)
+        self.U = float(U)
+        self.u = 0.0
+        self.sx = 0.0
+        self.sy = 0.0
+        self.r2 = 1.0
+        self.theta2 = 0.2
+        self.z2 = 0.0
+
+    # -------------------------------------------
+    # Setters — always emit changed()
+    # -------------------------------------------
+
+    def set_U(self, v):
+        self.U = float(v)
+        self.changed.emit()
+
+    def set_u(self, v):
+        self.u = float(v)
+        self.changed.emit()
+
+    def set_r2(self, v):
+        self.r2 = float(v)
+        self.changed.emit()
+
+    def set_theta2(self, v):
+        self.theta2 = float(v)
+        self.changed.emit()
+
+    def set_z2(self, v):
+        self.z2 = float(v)
+        self.changed.emit()
+
+    # P1 pivot in 2D mode
+    def set_pivot(self, x):
+        self.u = float(x)
+        self.changed.emit()
+
+    # P1 pivot in 3D mode (square coordinates)
+    def set_from_square(self, sx, sy):
+        self.sx = float(sx)
+        self.sy = float(sy)
+        self.changed.emit()
+
+
+[10] plugin_manager.py
+----------------------
+;Content of plugin_manager.py
+# core/plugin_manager.py
+
+import os, sys, importlib, traceback
+
+
+class PluginManager:
+
+    def __init__(self, engine_api, plugin_dir="plugins"):
+        self.engine_api = engine_api
+        self.plugin_dir = plugin_dir
+        self.plugins = {}
+
+    def _discover_files(self):
+        """ Locate all .py plugin files in plugin_dir. """
+        out = []
+        for root, dirs, files in os.walk(self.plugin_dir):
+            for f in files:
+                if f.endswith(".py") and f != "__init__.py":
+                    fullpath = os.path.join(root, f)
+                    out.append(fullpath)
+        return out
+
+    def load_all(self):
+        sys.path.insert(0, os.getcwd())
+        for file in self._discover_files():
+            self.load(file)
+
+    def load(self, file):
+        mod_name = file.replace("\\", "/").replace("/", ".")[:-3]
+        try:
+            module = importlib.import_module(mod_name)
+            importlib.reload(module)
+
+            if hasattr(module, "register"):
+                module.register(self.engine_api)
+
+            self.plugins[mod_name] = module
+            print(f"[PLUGIN] Loaded {mod_name}")
+
+        except Exception as e:
+            print(f"[PLUGIN] Failed to load {mod_name}: {e}")
+            traceback.print_exc()
+
+
+[11] state_helper.py
+--------------------
+;Content of state_helper.py
+# core/state_helper.py
+# ------------------------------------------------------------
+# Global address state manager
+# ------------------------------------------------------------
+
+class CodexDiagramStateHelper:
+    """
+    Manages the address text displayed under the diagram.
+    Stores last-known text for both '2d' and '3d'.
+    """
+
+    # 🔥 THIS WAS MISSING — REQUIRED FOR GLOBAL ACCESS
+    instance = None
+
+    def __init__(self, label):
+        self.label = label
+        self.active = "2d"
+        self.last = {"2d": "", "3d": ""}
+
+    def set_active(self, mode):
+        self.active = mode
+        self.label.setText(self.last.get(mode, ""))
+
+    def write(self, mode, text):
+        # store last text for mode
+        self.last[mode] = text
+
+        # update label immediately only if this mode is active
+        if mode == self.active:
+            self.label.setText(text)
+
+        # push into history if available
+        try:
+            from ui.main_window import AddressHistory
+            if AddressHistory.instance:
+                AddressHistory.instance.add(mode, text)
+        except:
+            pass
+
+
+
+
+[12] turing_complete_demo.py
+----------------------------
+;Content of turing_complete_demo.py
+# plugins/turing_complete_demo.py
+# ------------------------------------------------------------
+# Demonstrates Turing-completeness of the Codex plugin system.
+# Features:
+#   - infinite loop via QTimer
+#   - recursive fractal curve generator (Koch-like)
+#   - state mutation
+#   - dynamic path and subspace registration
+# ------------------------------------------------------------
+
+import math
+from PyQt6 import QtCore
+
+# ------------------------------------------------------------
+# RECURSIVE FRACTAL FUNCTION (non-trivial Turing behaviour)
+# ------------------------------------------------------------
+
+def fractal_segment(t, x1, y1, x2, y2, depth=4):
+    """Recursive Koch-type fractal generator."""
+    if depth == 0:
+        return (x1 + t*(x2-x1),
+                y1 + t*(y2-y1))
+    else:
+        # break into thirds
+        if t < 1/3:
+            return fractal_segment(t*3, x1, y1, (2*x1+x2)/3, (2*y1+y2)/3, depth-1)
+        elif t < 2/3:
+            # middle "peak"
+            xm1, ym1 = (2*x1+x2)/3, (2*y1+y2)/3
+            xm2, ym2 = (x1+2*x2)/3, (y1+2*y2)/3
+            # create a rotated "bump" outward
+            px = (xm1+xm2)/2 + (ym1-ym2)*0.5
+            py = (ym1+ym2)/2 - (xm1-xm2)*0.5
+            return fractal_segment((t-1/3)*3, xm1, ym1, px, py, depth-1)
+        else:
+            return fractal_segment((t-2/3)*3, (x1+2*x2)/3, (y1+2*y2)/3, x2, y2, depth-1)
+
+
+# ------------------------------------------------------------
+# PLUGIN ENTRY POINT
+# ------------------------------------------------------------
+
+def register(engine):
+    state = engine.get_state()
+
+    # --------------------------------------------------------
+    # Register a fully recursive fractal path
+    # --------------------------------------------------------
+    def fractal_path(t, sx1, sy1, sx2, sy2, z2):
+        x, y = fractal_segment(t, sx1, sy1, sx2, sy2, depth=4)
+        # optionally incorporate z2 and curve height
+        z = 0.25 * math.sin(10*t) + 0.1 * z2
+        return x, y, z
+
+    engine.register_path("fractal", fractal_path)
+
+    # --------------------------------------------------------
+    # Register a semantic subspace from arbitrary computation
+    # --------------------------------------------------------
+    engine.register_subspace("spiral_region", "math.sin(5*r) > 0")
+
+    # --------------------------------------------------------
+    # PROVE Turing completeness with an infinite computation
+    # --------------------------------------------------------
+    counter = {"value": 0}
+
+    def tick():
+        # Unbounded computation
+        counter["value"] += 1
+
+        # Mutate state (shows interaction)
+        state.set_theta2(state.theta2 + 0.003)
+
+        # Add complexity: oscillate r2
+        state.set_r2(abs(math.sin(counter["value"] * 0.01)) * 2 + 0.5)
+
+        # Repaint
+        engine.refresh()
+
+    # Infinite loop via timer (Turing-power)
+    timer = QtCore.QTimer()
+    timer.timeout.connect(tick)
+    timer.start(16)  # ~60Hz
+
+    print("[PLUGIN] Turing-complete demo loaded.")
+
+
