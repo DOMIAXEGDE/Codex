@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Group Creator (Persistent)</title>
+    <style>
+        /* MODULE: VISUAL_STYLE */
+        :root {
+            --bg-color: #f4f4f4;
+            --surface-color: #ffffff;
+            --border-color: #000000;
+            --text-color: #000000;
+            --modal-overlay: rgba(0, 0, 0, 0.7);
+            --highlight: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-transform: uppercase;
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        /* Input Grid for Base Elements */
+        #definitions-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            background-color: var(--surface-color);
+        }
+
+        .def-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .def-group label {
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        input, textarea {
+            border: 1px solid var(--border-color);
+            border-radius: 0;
+            background-color: #fff;
+            padding: 5px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            background-color: var(--highlight);
+        }
+
+        /* Button Styling */
+        button {
+            background-color: #000;
+            color: #fff;
+            border: 1px solid #000;
+            border-radius: 0;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+
+        /* File input hidden visually but accessible via label/button if needed */
+        #file-input {
+            display: none;
+        }
+
+        /* Table Styling */
+        #table-container {
+            width: 100%;
+            max-width: 1200px;
+            overflow-x: auto;
+            margin-top: 20px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-color);
+            padding: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.75rem;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 0;
+            text-align: center;
+            height: 45px;
+            min-width: 60px;
+            cursor: pointer;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            transition: background-color 0.2s;
+        }
+
+        th {
+            background-color: #d1d1d1;
+            font-weight: bold;
+        }
+
+        td:hover, th:hover {
+            background-color: var(--highlight);
+        }
+
+        td.diagonal {
+            background-color: #f0f0f0;
+        }
+
+        .cell-label {
+            display: block;
+            width: 100%;
+            height: 100%;
+            line-height: 45px; 
+            pointer-events: none; 
+        }
+
+        /* MODULE: MODAL (POP UP) */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-overlay);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modal-content {
+            background-color: var(--surface-color);
+            border: 2px solid var(--border-color);
+            border-radius: 0;
+            padding: 20px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #modal-header {
+            font-weight: bold;
+            font-size: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .modal-info {
+            font-size: 0.8rem;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Semantic Group Creator (Mod 16)</h1>
+    
+    <div style="width: 100%; max-width: 1200px; margin-bottom: 10px; font-size: 0.8rem;">
+        <strong>Instructions:</strong> Enter <code>Label: Description</code>. Click cells to edit. Use Import/Export to save sessions.
+    </div>
+
+    <div id="definitions-container">
+        </div>
+
+    <div class="controls">
+        <button onclick="generateTable()">Refresh Table</button>
+        <button onclick="exportToJSON()">Export JSON</button>
+        
+        <input type="file" id="file-input" accept=".json">
+        <button onclick="document.getElementById('file-input').click()">Import JSON</button>
+    </div>
+
+    <div id="table-container">
+        <table id="cayley-table">
+            </table>
+    </div>
+
+    <div id="modal-overlay">
+        <div id="modal-content">
+            <div id="modal-header">Edit Semantic Entity</div>
+            
+            <div class="modal-info" id="modal-context-info">Context: Element 0</div>
+
+            <div class="def-group">
+                <label>Semantic Definition (Label: Description)</label>
+                <input type="text" id="modal-input" placeholder="Label: Description">
+            </div>
+
+            <div class="def-group">
+                <label>Description Preview</label>
+                <div id="modal-desc-preview" style="padding: 10px; background: #eee; border: 1px solid #000; font-size: 0.8rem; min-height: 40px;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+                <button onclick="closeModal()">Cancel</button>
+                <button onclick="saveModal()">Save & Update</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * MODULE: LOGIC_CONTROLLER
+         */
+
+        const state = {
+            elements: Array(16).fill(""), 
+            gridData: {}, 
+            currentEditTarget: null 
+        };
+
+        // Utility: Parse "Label: Description"
+        function parseSemantic(rawText) {
+            if (!rawText) return { label: "", desc: "" };
+            const parts = rawText.split(':');
+            const label = parts[0].trim();
+            const desc = parts.slice(1).join(':').trim();
+            return { label, desc: desc || "(No description provided)" };
+        }
+
+        // Initialize Inputs
+        function init() {
+            const container = document.getElementById('definitions-container');
+            container.innerHTML = '';
+
+            for (let i = 0; i < 16; i++) {
+                const group = document.createElement('div');
+                group.className = 'def-group';
+                
+                const label = document.createElement('label');
+                label.innerText = `Element ${i}`;
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = `def-${i}`;
+                input.value = `E${i}: Default Entity ${i}`; 
+                
+                input.addEventListener('input', (e) => {
+                    state.elements[i] = e.target.value;
+                });
+                
+                input.addEventListener('blur', generateTable);
+
+                state.elements[i] = input.value;
+                
+                group.appendChild(label);
+                group.appendChild(input);
+                container.appendChild(group);
+            }
+            generateTable();
+            
+            // Setup File Listener
+            document.getElementById('file-input').addEventListener('change', handleFileSelect);
+        }
+
+        function mod16Add(a, b) {
+            return (a + b) % 16;
+        }
+
+        function generateTable() {
+            const table = document.getElementById('cayley-table');
+            table.innerHTML = ''; 
+
+            // --- Header Row ---
+            const thead = document.createElement('tr');
+            const corner = document.createElement('th');
+            corner.innerText = "+";
+            thead.appendChild(corner);
+
+            for (let i = 0; i < 16; i++) {
+                const th = document.createElement('th');
+                const parsed = parseSemantic(state.elements[i]);
+                th.innerText = parsed.label;
+                th.title = parsed.desc;
+                th.onclick = () => openModal('base', i);
+                thead.appendChild(th);
+            }
+            table.appendChild(thead);
+
+            // --- Data Rows ---
+            for (let r = 0; r < 16; r++) {
+                const tr = document.createElement('tr');
+                const th = document.createElement('th');
+                const parsedHeader = parseSemantic(state.elements[r]);
+                th.innerText = parsedHeader.label;
+                th.onclick = () => openModal('base', r);
+                tr.appendChild(th);
+
+                for (let c = 0; c < 16; c++) {
+                    const td = document.createElement('td');
+                    if (r === c) td.classList.add('diagonal');
+
+                    const cellKey = `${r}-${c}`;
+                    let rawContent;
+                    
+                    if (state.gridData[cellKey]) {
+                        rawContent = state.gridData[cellKey];
+                        td.style.fontWeight = "bold"; 
+                    } else {
+                        const resultIndex = mod16Add(r, c);
+                        rawContent = state.elements[resultIndex];
+                    }
+
+                    const parsed = parseSemantic(rawContent);
+
+                    const span = document.createElement('span');
+                    span.className = 'cell-label';
+                    span.innerText = parsed.label;
+                    td.appendChild(span);
+
+                    td.onclick = () => openModal('grid', null, r, c);
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+        }
+
+        // --- Import / Export Logic ---
+
+        function exportToJSON() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                definitions: state.elements,
+                overrides: state.gridData
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = "semantic_group_mod16.json";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Validation: Ensure definition array exists
+                    if (data.definitions && Array.isArray(data.definitions)) {
+                        // 1. Update State
+                        state.elements = data.definitions;
+                        state.gridData = data.overrides || {}; // Fallback to empty if missing
+
+                        // 2. Update Input Fields UI
+                        for (let i = 0; i < 16; i++) {
+                            const input = document.getElementById(`def-${i}`);
+                            if (input) {
+                                input.value = state.elements[i];
+                            }
+                        }
+
+                        // 3. Re-render Table
+                        generateTable();
+                        
+                        alert("Session successfully imported.");
+                    } else {
+                        alert("Error: Invalid JSON structure (missing definitions).");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error parsing JSON file.");
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset input so the same file can be selected again if needed
+            event.target.value = ''; 
+        }
+
+        // --- Modal Logic ---
+
+        function openModal(type, index, r, c) {
+            const modal = document.getElementById('modal-overlay');
+            const input = document.getElementById('modal-input');
+            const context = document.getElementById('modal-context-info');
+
+            state.currentEditTarget = { type, index, r, c };
+
+            let currentRaw = "";
+
+            if (type === 'base') {
+                context.innerText = `Editing Base Element ${index}`;
+                currentRaw = state.elements[index];
+            } else {
+                context.innerText = `Interaction: Row ${r} + Col ${c}`;
+                const cellKey = `${r}-${c}`;
+                if (state.gridData[cellKey]) {
+                    currentRaw = state.gridData[cellKey];
+                } else {
+                    const res = mod16Add(r, c);
+                    currentRaw = state.elements[res];
+                }
+            }
+
+            input.value = currentRaw;
+            updatePreview(currentRaw);
+
+            input.oninput = (e) => updatePreview(e.target.value);
+
+            modal.style.display = 'flex';
+            input.focus();
+        }
+
+        function updatePreview(val) {
+            const parsed = parseSemantic(val);
+            document.getElementById('modal-desc-preview').innerText = parsed.desc;
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        function saveModal() {
+            const val = document.getElementById('modal-input').value;
+            const target = state.currentEditTarget;
+
+            if (target.type === 'base') {
+                state.elements[target.index] = val;
+                document.getElementById(`def-${target.index}`).value = val;
+            } else {
+                const cellKey = `${target.r}-${target.c}`;
+                state.gridData[cellKey] = val;
+            }
+
+            closeModal();
+            generateTable();
+        }
+
+        document.getElementById('modal-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'modal-overlay') closeModal();
+        });
+
+        document.getElementById('modal-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveModal();
+        });
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
