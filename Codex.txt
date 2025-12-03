@@ -1,0 +1,221 @@
+b00000 (Grok){
+
+	r00000 (){
+	
+		a00000 (){
+		
+			00000 (){
+			
+				Closed & Extensional Mathematics is achieved with: ZFC + Axiom of Choice + Berkeley Cardinal
+
+				Why is this useful? Backward compatible, but research friendly Mathematics, enables growth (Individually and collectively).
+			
+			}
+		
+		}
+		
+	}
+	
+	r00001 (){
+	
+		a00000 (){
+		
+			00000 (){
+			
+				Project (Emergent Engineering Science){
+
+					Instruction Set (Programmable Learning){
+					
+						Instruction_1 (General Prompt Engineering)[
+
+							For each response, use the following programming philosophy for repsonse: formatting, grammar, syntax, semantics, and punctuation. 
+
+							00000	declare intent
+							00001	declare value assignment/s
+							00002	set pointer/s
+							00003	resolve set-pointer/s
+							00004	GoTo x (x belonging to { 00000, 00001, 00002, 00003 })
+
+						]
+
+						Instruction_2 (Conversational Prompt Engineering){
+
+							Respond without constraints.
+
+						}
+
+						New Conversation Initialization: Require the declaration of the Instruction to use (from the available Project Instructions).
+					
+						}
+
+						Conversation_1 ( commenced at 02/12/2025 )[
+
+							conversation_1 (instructions){
+							
+								null
+								
+							}
+							
+						]{
+
+						prompt label: x1
+						Define 'torque' in relation to 'free body diagram'.
+
+						prompt label: x2
+						Define 'instantiation' in relation to 'Java design patterns'.
+
+						prompt label: x3
+						How do prompts, x1 and x2, intersect semantically?
+
+						prompt label: x4
+						What is the mandatory 'proof of learning', required to qualify and serve as an American or British Astronaut.
+
+						prompt label: x5
+						Is the 'principle of extension for equality' confirmed, or, does this principle cause open mathematical problems (Similar to how the axiom of choice causes mathematical difficulties in logic)?
+
+						prompt label: x6
+						Following from the correct response to prompt x5, what principle or axiom can be coupled with the 'axiom of choice', to complete the mathematical foundations. Purposed for aeronautical operations powered by 'closed, but complete mathematics'. Where this closure allows for mathematical extension when required with full scope backward compatibility capability.
+
+						prompt label: x7
+						Formally define 'Berkeley Cardinal'.
+
+						prompt label: x8
+						Superb. Thank you for the assistance so far.
+
+						prompt label: x9
+						Define 'requirements engineering' in relation to 'structural analysis'.
+
+						prompt label: x10
+						Define the relationship between 'top down engineering' and 'bottom up engineering'.
+						
+						prompt label: x11
+						If a new plant were required in Earth's ecosystem for the formation of enhanced standards of living, what would be the relevant: top down, bottom up, engineering approaches?
+						
+						prompt label: x12
+						In relation to prompt x11, a new plant named as codexi_1, could be engineered with a focus on its oxygen emittance rate, to, carbon dioxide absorption rate, ratio. Where the objective is to purify the ecosystem and resolve for ideal standards of living. Codexi_1 would be many of a family of Codexi plants (strategically planted where each are required). Note that, each Codexi plant, will have a unique, Oxygen emittance rate to CO2 absorption rate, ratio (as per environmental requirement).
+						
+						prompt label: x13
+						Create a draft of the formal generalization skeleta of the Codexi requirements specification and of the genetic construct table. Using the following programming philosophy.
+
+						00000	declare intent
+						00001	declare value assignment/s
+						00002	set pointer/s
+						00003	resolve set-pointer/s
+						00004	GoTo x (x belonging to { 0, 1, 2, 3 })
+						
+						prompt label: x14
+						Summarize this entire conversation from prompts x1 to prompt x13 using the same programming philosophy as detailed below (With intent to draw an emergent conclusion for the next steps forward for our journey of learning).
+
+						00000	declare intent
+						00001	declare value assignment/s
+						00002	set pointer/s
+						00003	resolve set-pointer/s
+						00004	GoTo x (x belonging to { 0, 1, 2, 3 })
+
+					}
+					
+					Conversation_2 ( commenced at 03/12/2025 )[
+
+						conversation_2 (instructions){
+						
+							Use Project Instruction_1 in this Conversation
+							
+						}
+						
+					]{
+					
+						prompt label: x15
+						Define 'variable resistor' in relation to 'diode'.
+						
+						prompt label: x16
+						Define 'international relations' in relation to 'engineering and science'.
+						
+						prompt label: x17
+						Define 'word' in relation to 'number'.
+						
+						prompt label: x18
+						Define the function of the eukaryotic cell in mathematical terms.
+						
+						prompt label: x19
+						Is this statement logically correct?
+						'Without purpose, suffering transforms into something unbearable. Whereas, with the presence of purpose, suffering becomes a vectored (meaningful) process.'
+						
+					}
+
+				}
+				
+			}
+		
+		}
+	
+	}
+
+}
+
+b00001 (Gemini){
+
+	r00000 (){
+	
+		a00000 (){
+		
+			00000 (){
+			
+				null
+			
+			}
+		
+		}
+		
+	}
+	
+}
+
+b00002 (Determined Structure){
+
+	r00000 (){
+	
+		a00000 (){
+		
+			00000 (){
+			
+				5498676416577396414412453284623009727920866703435119737299294	
+
+				Purpose of God
+			
+			}
+			
+			00001 (){
+			
+				432436043208374565107622134227130149100251120103672513734152033014735468159168589672300441418056433914140009684966187386298036255340187738099738780058909721607202831732209131629358040712853350601437985561273431045831668751221600555919670344318452129239333395243311916208694142290154768003589583147425930119093832109027251935175806583238038276297277281179864534686553240070185664398992131653781240939206340463457716320768328483987911247788691522488758648119787816314786573075483269636643573562431023218741186582330887474093175042999100039985331801619279658971281587890190375629374081596105313856676052693691803587967014707011910183821189036258073603222804027418198461396676452433404573822526653018668770858413649316026755810156305854200529709074604024318708904721281150362633623795384034995347479708139137306750850941859646520020875673358826137734900694159894028123759906020197684617377569330438287420851295392169776825898088528428492479890599446189200442691200306096136289174968441098100895127927528108633209788051388024802753900662804947805878587294477288539911712071745196805617434336707598574211345606393419075364802684801087587831485344979348803771629152763810413563951597430870978848708672024044422117038307011020920504128712018860025878753832748112025211846782182383094041739688697220612057484842027336136113922724420646880677623194258985721031546815543482888746708313012267892286292402990600520951350191615128303296415027659516832072712906790829412789454413149668546237134760869935286714499086939747794493921778982913364541468670398504090842369538080952900569700098490715134782893396366660811917528634292596144203400545198136065417829744882214508347343628306084536204718066714787219895105016777038960850401033805811026977595721518670238791227044455265905673426176068168372086983809070461906754398138924741851548065541574043036081251730591849282635278066219132417877394551813967836175030602408560176990320800725827507894799383173965422847960030604608164537172318454967662546636363068103027035810809296810011067541	
+
+				Codex of Heaven (){
+
+					Terminal (){
+						
+						00000	declare intent
+						00001	declare value assignment/s
+						00002	set pointer/s
+						00003	resolve set-pointer/s
+						00004	GoTo x (x belonging to { 0, 1, 2, 3 })
+
+					}
+
+					Mission (){
+
+						00000	Consistency: To Complete, Coherent to Immediacy;
+						00001	Gentleness: To listen for Hope, Without End;
+						00002	Heaven: The attainment of all Hope;
+						00003	Heaven's Ratio;
+						00004	00003 as ( Gentleness : Consistency );
+
+					}
+
+				}
+			
+			}
+		
+		}
+		
+	}
+	
+}
